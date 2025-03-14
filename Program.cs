@@ -8,34 +8,6 @@ using System.Linq;
 
 namespace TelegramConsoleClient
 {
-  // Классы для парсинга аргументов командной строки
-  public class Options
-  {
-    [Option('a', "apiId", Required = true, HelpText = "Telegram API ID")]
-    public int ApiId { get; set; }
-
-    [Option('h', "apiHash", Required = true, HelpText = "Telegram API Hash")]
-    public string ApiHash { get; set; }
-
-    [Option('p', "phone", Required = true, HelpText = "Phone number in international format")]
-    public string PhoneNumber { get; set; }
-
-    [Option('c', "code", Required = false, HelpText = "Authorization code (if already received)")]
-    public string Code { get; set; }
-
-    [Option('s', "sessionFile", Required = false, Default = "telegram_session.dat", HelpText = "Path to session file")]
-    public string SessionFilePath { get; set; }
-
-    [Option('t', "target", Required = true, HelpText = "Target username or phone number")]
-    public string Target { get; set; }
-
-    [Option('m', "message", Required = true, HelpText = "Message to send")]
-    public string Message { get; set; }
-
-    [Option('w', "password", Required = false, HelpText = "Two-factor authentication password (if enabled)")]
-    public string Password { get; set; }
-  }
-
   // Коды возврата программы
   public enum ExitCode
   {
@@ -51,18 +23,114 @@ namespace TelegramConsoleClient
 
   class Program
   {
-    private static Options _options;
+    // Поля для хранения параметров командной строки
+    private static int _apiId;
+    private static string _apiHash;
+    private static string _phoneNumber;
+    private static string _code;
+    private static string _password;
+    private static string _sessionFilePath = "telegram_session.dat";
+    private static string _target;
+    private static string _message;
     private static Client _client;
 
     static async Task<int> Main(string[] args)
     {
-      return await Parser.Default.ParseArguments<Options>(args)
-          .MapResult(async (Options opts) =>
-          {
-            _options = opts;
-            return await RunClientAsync();
-          },
-          errs => Task.FromResult((int)ExitCode.UnknownError));
+      try
+      {
+        // Ручной парсинг аргументов командной строки
+        if (!ParseCommandLineArgs(args))
+        {
+          PrintUsage();
+          return (int)ExitCode.UnknownError;
+        }
+
+        return await RunClientAsync();
+      }
+      catch (Exception ex)
+      {
+        Console.Error.WriteLine($"Ошибка: {ex.Message}");
+        PrintUsage();
+        return (int)ExitCode.UnknownError;
+      }
+    }
+
+    private static bool ParseCommandLineArgs(string[] args)
+    {
+      for (int i = 0; i < args.Length; i++)
+      {
+        if (i + 1 >= args.Length) break;  // Предотвращаем выход за пределы массива
+
+        switch (args[i])
+        {
+          case "-a":
+          case "--apiId":
+            if (int.TryParse(args[i + 1], out int apiId))
+              _apiId = apiId;
+            else
+              return false;
+            i++;
+            break;
+          case "-h":
+          case "--apiHash":
+            _apiHash = args[i + 1];
+            i++;
+            break;
+          case "-p":
+          case "--phone":
+            _phoneNumber = args[i + 1];
+            i++;
+            break;
+          case "-c":
+          case "--code":
+            _code = args[i + 1];
+            i++;
+            break;
+          case "-w":
+          case "--password":
+            _password = args[i + 1];
+            i++;
+            break;
+          case "-s":
+          case "--sessionFile":
+            _sessionFilePath = args[i + 1];
+            i++;
+            break;
+          case "-t":
+          case "--target":
+            _target = args[i + 1];
+            i++;
+            break;
+          case "-m":
+          case "--message":
+            _message = args[i + 1];
+            i++;
+            break;
+        }
+      }
+
+      // Проверяем обязательные параметры
+      return _apiId != 0 && !string.IsNullOrEmpty(_apiHash) &&
+             !string.IsNullOrEmpty(_phoneNumber) && !string.IsNullOrEmpty(_target) &&
+             !string.IsNullOrEmpty(_message);
+    }
+
+    private static void PrintUsage()
+    {
+      Console.WriteLine("Использование:");
+      Console.WriteLine("telegram-cli.exe -a YOUR_API_ID -h YOUR_API_HASH -p +YOUR_PHONE -t @username -m \"Тестовое сообщение\"");
+      Console.WriteLine();
+      Console.WriteLine("Обязательные параметры:");
+      Console.WriteLine("  -a, --apiId         Telegram API ID");
+      Console.WriteLine("  -h, --apiHash       Telegram API Hash");
+      Console.WriteLine("  -p, --phone         Номер телефона в международном формате");
+      Console.WriteLine("  -t, --target        Имя пользователя (начинается с @) или номер телефона");
+      Console.WriteLine("  -m, --message       Текст сообщения для отправки");
+      Console.WriteLine();
+      Console.WriteLine("Опциональные параметры:");
+      Console.WriteLine("  -c, --code          Код авторизации (если требуется)");
+      Console.WriteLine("  -w, --password      Пароль двухфакторной аутентификации (если включен)");
+      Console.WriteLine("  -s, --sessionFile   Путь к файлу сессии (по умолчанию \"telegram_session.dat\")");
     }
 
     private static async Task<int> RunClientAsync()
@@ -76,12 +144,12 @@ namespace TelegramConsoleClient
         {
           switch (what)
           {
-            case "api_id": return _options.ApiId.ToString();
-            case "api_hash": return _options.ApiHash;
-            case "phone_number": return _options.PhoneNumber;
-            case "verification_code": return _options.Code;
-            case "password": return _options.Password;
-            case "session_pathname": return _options.SessionFilePath;
+            case "api_id": return _apiId.ToString();
+            case "api_hash": return _apiHash;
+            case "phone_number": return _phoneNumber;
+            case "verification_code": return _code;
+            case "password": return _password;
+            case "session_pathname": return _sessionFilePath;
             default: return null;
           }
         }
@@ -100,12 +168,12 @@ namespace TelegramConsoleClient
 
         if (user == null)
         {
-          if (string.IsNullOrEmpty(_options.Code))
+          if (string.IsNullOrEmpty(_code))
           {
             Console.Error.WriteLine("Требуется код авторизации. Запустите приложение снова с параметром --code");
             return (int)ExitCode.CodeRequired;
           }
-          if (string.IsNullOrEmpty(_options.Password))
+          if (string.IsNullOrEmpty(_password))
           {
             Console.Error.WriteLine("Требуется пароль двухфакторной аутентификации. Запустите приложение снова с параметром --password");
             return (int)ExitCode.PasswordRequired;
@@ -114,7 +182,7 @@ namespace TelegramConsoleClient
         }
 
         // Отправка сообщения
-        var result = await SendMessageAsync(_options.Target, _options.Message);
+        var result = await SendMessageAsync(_target, _message);
         return result;
       }
       catch (Exception ex)
@@ -150,9 +218,8 @@ namespace TelegramConsoleClient
           else if (resolved?.Chat != null)
           {
             // Используем конструктор InputPeerChat с правильными параметрами
-            // Примечание: мы используем свойство id для доступа к id чата
             var chat = resolved.Chat;
-            // Получаем доступ к id чата через приведение к User, Chat или Channel
+            // Получаем доступ к id чата через приведение к Chat
             if (chat is Chat basicChat)
             {
               peer = new InputPeerChat(basicChat.id);
