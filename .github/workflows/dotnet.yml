@@ -1,4 +1,4 @@
-name: Build Telegram CLI Client
+name: Build and Release Telegram CLI Client
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
       run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./publish/${{ matrix.rid }}
     
     - name: Rename binary
-      run: mv ./publish/${{ matrix.rid }}/tgcli${{ matrix.extension }} ./publish/${{ matrix.rid }}/telegram-cli-${{ matrix.rid }}${{ matrix.extension }}
+      run: mv ./publish/${{ matrix.rid }}/tgcli${{ matrix.extension }} ./publish/${{ matrix.rid }}/tgcli-${{ matrix.rid }}${{ matrix.extension }}
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -58,12 +58,40 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         path: ./artifacts
+        
+    - name: Create README.md for release
+      run: |
+        echo "# Telegram CLI Client - $(echo ${{ github.ref_name }})" > ./release-notes.md
+        echo "" >> ./release-notes.md
+        echo "A non-interactive command-line client for sending Telegram messages." >> ./release-notes.md
+        echo "" >> ./release-notes.md
+        echo "## Available Builds" >> ./release-notes.md
+        echo "- Windows (64-bit): tgcli-win-x64.exe" >> ./release-notes.md
+        echo "- Linux (64-bit): tgcli-linux-x64" >> ./release-notes.md
+        echo "- macOS (64-bit): tgcli-osx-x64" >> ./release-notes.md
+        echo "" >> ./release-notes.md
+        echo "For usage instructions, see the main README.md in the repository." >> ./release-notes.md
     
-    - name: Create Release
+    - name: Make Linux and macOS binaries executable
+      run: |
+        chmod +x ./artifacts/tgcli-linux-x64/tgcli-linux-x64
+        chmod +x ./artifacts/tgcli-osx-x64/tgcli-osx-x64
+        
+    - name: Create release ZIP files
+      run: |
+        mkdir ./release
+        cd ./artifacts/tgcli-win-x64/ && zip -r ../../release/tgcli-win-x64.zip tgcli-win-x64.exe && cd ../../
+        cd ./artifacts/tgcli-linux-x64/ && zip -r ../../release/tgcli-linux-x64.zip tgcli-linux-x64 && cd ../../
+        cd ./artifacts/tgcli-osx-x64/ && zip -r ../../release/tgcli-osx-x64.zip tgcli-osx-x64 && cd ../../
+    
+    - name: Create GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: ./artifacts/**/*
+        files: |
+          ./release/*.zip
+          ./release-notes.md
+        body_path: ./release-notes.md
         draft: false
         prerelease: false
         generate_release_notes: true
