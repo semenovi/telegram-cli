@@ -10,7 +10,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <AssemblyName>tgcli</AssemblyName>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="WTelegramClient" Version="4.3.2" />
