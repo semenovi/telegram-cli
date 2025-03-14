@@ -37,7 +37,7 @@ jobs:
       run: dotnet build --no-restore
     
     - name: Publish
-      run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o ./publish/${{ matrix.rid }}
+      run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=true -o ./publish/${{ matrix.rid }}
     
     - name: Rename binary
       run: mv ./publish/${{ matrix.rid }}/telegram-cli${{ matrix.extension }} ./publish/${{ matrix.rid }}/telegram-cli-${{ matrix.rid }}${{ matrix.extension }}
